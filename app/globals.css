@@ -1,0 +1,596 @@
+@import "tailwindcss";
+
+/* ── SKS GROUPS – Core Configuration ────────────────────────── */
+
+:root {
+  --background-warm: #fdf8f4; /* warm white base */
+  --sks-dark-brown: #3d1c06;  /* brand dark */
+  --sks-mid-brown: #6b3a1f;   /* transition blocks */
+  --sks-light-brown: #9c5a2e; /* accents */
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Barlow Condensed", sans-serif;
+  background-color: #fdf8f4; /* warm white — base page bg */
+  color: #3d1c06;            /* darkest brown for body text */
+}
+
+/* ── Page Layout ────────────────────────────────────────────── */
+
+.container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100svh;
+  background-color: var(--background-warm);
+}
+
+.page-header {
+  width: 100vw;
+  height: 100svh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+/* ── Page Transition — Block Overlay ───────────────────────── 
+   Staggered vertical strips for the sweep animation 
+────────────────────────────────────────────────────────────── */
+
+.transition-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100svh;
+  display: flex;
+  pointer-events: none;
+  z-index: 9998; /* Under the logo */
+  overflow: hidden;
+}
+
+.block {
+  flex: 1;
+  height: 100%;
+  background: var(--sks-mid-brown); /* The sweep color */
+  transform: scaleX(0);
+  transform-origin: left;
+  will-change: transform;
+}
+
+/* ── Page Transition — Logo Overlay ────────────────────────── 
+   White panel where the Logo building "rises" 
+────────────────────────────────────────────────────────────── */
+
+.logo-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100svh;
+  z-index: 9999; /* Topmost layer */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  opacity: 0;
+  background-color: #ffffff; /* Contrast for the rise animation */
+}
+
+.logo-container {
+  width: 60%;
+  max-width: 780px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ── GSAP Helper ────────────────────────────────────────────── */
+
+.char {
+  position: relative;
+  display: inline-block;
+  will-change: transform;
+}
+
+/* ── Projects Page Specific Styles ───────────────────────────── */
+
+.projects-page {
+  min-height: 100vh;
+  background-color: #1a1a1a;
+  overflow-x: hidden;
+}
+
+.projects-nav {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem;
+  display: flex;
+  justify-content: center;
+  gap: 2.5rem;
+  z-index: 100;
+}
+
+.projects-nav a {
+  color: #5C4033;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.projects-nav a:hover {
+  color: #9C5A2E;
+}
+
+/* Gallery Container */
+.gallery-container {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #1a1a1a;
+  padding-top: 80px; /* Space for fixed navbar */
+  overflow: hidden;
+}
+
+/* Horizontal Scroll Gallery */
+.gallery {
+  display: flex;
+  flex-wrap: nowrap;
+  height: 100vh;
+  width: fit-content;
+}
+
+.gallery-section {
+  height: 100vh;
+  width: 100vw;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.gallery-content {
+  width: 90%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.gallery-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  transition: transform 0.3s ease;
+}
+
+.gallery-item:hover {
+  transform: translateY(-10px);
+}
+
+.gallery-img {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.gallery-caption {
+  margin-top: 1rem;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 300;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.gallery-title {
+  font-size: 3rem;
+  color: #9C5A2E;
+  margin-bottom: 2rem;
+  font-weight: 600;
+}
+
+/* Column Scroll Gallery */
+.col-scroll {
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  padding: 2rem 0;
+  position: relative;
+}
+
+.col-scroll__box {
+  display: flex;
+  flex-direction: column;
+  padding: 5vh 1rem 15vh;
+  width: 33.333%;
+}
+
+.col-scroll__box:nth-child(odd) {
+  flex-direction: column-reverse;
+  margin-top: 20vh;
+}
+
+.col-scroll__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.col-scroll__box:nth-child(odd) .col-scroll__list {
+  flex-direction: column-reverse;
+}
+
+.col-scroll__item {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  opacity: 0;
+  transform: translateY(50px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.col-scroll__item.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.col-scroll__img {
+  aspect-ratio: 6/7;
+  height: auto;
+  object-fit: cover;
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.col-scroll__title {
+  margin: 12px 0 16px;
+  font-size: 1rem;
+  color: #ffffff;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .gallery-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .col-scroll {
+    flex-direction: column;
+  }
+  
+  .col-scroll__box {
+    width: 100%;
+    padding: 2vh 1rem;
+  }
+  
+  .col-scroll__box:nth-child(odd) {
+    margin-top: 0;
+  }
+  
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  
+  .gallery-img {
+    height: 200px;
+  }
+  
+  .gallery-title {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .gallery-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .logo-container {
+    width: 90%;
+  }
+}
+/* Add/modify these styles in your globals.css */
+
+/* Column Scroll Gallery - Fixed Version */
+.col-scroll {
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.col-scroll__box {
+  display: flex;
+  flex-direction: column;
+  width: 33.333%;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.col-scroll__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 2rem;
+  will-change: transform;
+}
+
+.col-scroll__box:nth-child(odd) .col-scroll__list {
+  flex-direction: column-reverse;
+}
+
+.col-scroll__item {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  opacity: 1;
+  transform: none;
+}
+
+.col-scroll__img {
+  aspect-ratio: 6/7;
+  height: auto;
+  object-fit: cover;
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.col-scroll__title {
+  margin: 12px 0 16px;
+  font-size: 1rem;
+  color: #ffffff;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+/* Fixed navbar for projects page */
+.projects-nav {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem;
+  display: flex;
+  justify-content: center;
+  gap: 2.5rem;
+  z-index: 100;
+}
+
+.projects-nav a {
+  color: #5C4033;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.projects-nav a:hover {
+  color: #9C5A2E;
+}
+
+/* Gallery Container */
+.gallery-container {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #1a1a1a;
+  padding-top: 80px; /* Space for fixed navbar */
+  overflow: hidden;
+}
+/* Add/modify these styles in your globals.css */
+
+/* Column Scroll Gallery - Working Version */
+.projects-page {
+  min-height: 100vh;
+  background-color: #1a1a1a;
+  overflow-x: hidden;
+}
+
+.projects-nav {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem;
+  display: flex;
+  justify-content: center;
+  gap: 2.5rem;
+  z-index: 100;
+}
+
+.projects-nav a {
+  color: #5C4033;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+}
+
+/* Gallery Container */
+.gallery-wrapper {
+  position: relative;
+  width: 100%;
+  background-color: #1a1a1a;
+  padding-top: 80px;
+}
+
+/* Three Column Layout */
+.columns-container {
+  display: flex;
+  width: 100%;
+  min-height: 200vh; /* Extra height for scrolling */
+  position: relative;
+}
+
+.column {
+  width: 33.333%;
+  padding: 2rem 1rem;
+  position: relative;
+}
+
+.column-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  will-change: transform;
+}
+
+/* Different direction for odd columns */
+.column:nth-child(odd) .column-content {
+  flex-direction: column-reverse;
+}
+
+.painting-card {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease;
+}
+
+.painting-card:hover {
+  transform: scale(1.02);
+}
+
+.painting-image {
+  width: 100%;
+  aspect-ratio: 6/7;
+  object-fit: cover;
+  display: block;
+}
+
+.painting-title {
+  padding: 1rem;
+  text-align: center;
+  color: white;
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Header Section */
+.projects-header {
+  padding: 4rem 2rem 2rem;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+  background: linear-gradient(to bottom, #1a1a1a 0%, #1a1a1a 80%, transparent 100%);
+}
+
+.projects-header h1 {
+  font-size: 4rem;
+  color: #9C5A2E;
+  margin-bottom: 1rem;
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+.projects-header p {
+  color: white;
+  font-size: 1.2rem;
+  max-width: 800px;
+  margin: 0 auto;
+  font-family: "Barlow Condensed", sans-serif;
+  letter-spacing: 1px;
+}
+
+/* Footer Section */
+.projects-footer {
+  padding: 4rem 2rem;
+  background-color: #222;
+  position: relative;
+  z-index: 10;
+}
+
+.projects-footer h2 {
+  font-size: 2.5rem;
+  color: #9C5A2E;
+  text-align: center;
+  margin-bottom: 3rem;
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 700;
+}
+
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.featured-item {
+  text-align: center;
+}
+
+.featured-image {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.featured-title {
+  margin-top: 1rem;
+  color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .columns-container {
+    flex-direction: column;
+  }
+  
+  .column {
+    width: 100%;
+    padding: 1rem;
+  }
+  
+  .projects-header h1 {
+    font-size: 2.5rem;
+  }
+}
