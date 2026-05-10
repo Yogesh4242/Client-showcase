@@ -6,63 +6,74 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { Sky } from "three/examples/jsm/objects/Sky.js";
 
-// ─── Camera Views ───────────────────────────────────────────────
+// ─── Camera Views (updated to match the reference code) ───────────────────────
 const TARGET = new THREE.Vector3(0, 2, 0);
 
 const VIEWS = {
-  front: {
+  // Seating Area view (formerly "front")
+  front: { 
     position: new THREE.Vector3(5.86, 10.44, 8.24),
-    target: new THREE.Vector3(2.20, 6.03, 10.98),
+    target: new THREE.Vector3(2.20, 6.03, 10.98)
   },
-  back: {
+  // Pergola View (formerly "back")
+  back: { 
     position: new THREE.Vector3(3.56, 6.58, -2.84),
-    target: new THREE.Vector3(3.50, 6.51, -3.02),
+    target: new THREE.Vector3(3.50, 6.51, -3.02)
   },
-  overview: {
+  // Overview (formerly "top")
+  overview: { 
     position: new THREE.Vector3(0, 28, 6),
-    target: new THREE.Vector3(0, 0, -2),
+    target: new THREE.Vector3(0, 0, -2)
   },
 };
 
 type ViewKey = keyof typeof VIEWS;
 
-// ─── Per-View Orbit Constraints (improved zoom ranges) ─────────
+// ─── Per-View Orbit Constraints (from reference code) ─────────────────────────
 const VIEW_CONSTRAINTS = {
   front: {
-    minDistance: 3.0,
-    maxDistance: 25.0, // was 12 – now zoom out much farther
+    minDistance:     3.0,
+    maxDistance:    12.0,
     minAzimuthAngle: 2.31 - Math.PI / 3,
     maxAzimuthAngle: 2.31 + Math.PI / 3,
-    minPolarAngle: 0.25,
-    maxPolarAngle: Math.PI / 2.2,
+    minPolarAngle:   0.25,
+    maxPolarAngle:   Math.PI / 2.2,
   },
   back: {
-    minDistance: 0.1,
-    maxDistance: 30.0, // was 10 – zoom out without feeling stuck
+    minDistance:     0.1,
+    maxDistance:    10.0,
     minAzimuthAngle: 0.71 - Math.PI / 3,
     maxAzimuthAngle: 0.71 + Math.PI / 3,
-    minPolarAngle: 0.10,
-    maxPolarAngle: Math.PI / 2.1,
+    minPolarAngle:   0.10,
+    maxPolarAngle:   Math.PI / 2.1,
   },
   overview: {
-    minDistance: 5.0,
-    maxDistance: 120.0,
+    minDistance:     5.0,
+    maxDistance:   120.0,
     minAzimuthAngle: -Infinity,
-    maxAzimuthAngle: Infinity,
-    minPolarAngle: 0.0,
-    maxPolarAngle: Math.PI / 2.08,
+    maxAzimuthAngle:  Infinity,
+    minPolarAngle:   0.0,
+    maxPolarAngle:   Math.PI / 2.08,
   },
 } as const;
 
-// ─── Easing ────────────────────────────────────────────────────
+// ─── Zoom limits per view (keeping original structure for compatibility) ──────
+const ZOOM_MAX: Record<ViewKey, number> = {
+  front: VIEWS.front.position.distanceTo(TARGET),
+  back: VIEWS.back.position.distanceTo(TARGET),
+  overview: 35,
+};
+
+// ─── Easing ───────────────────────────────────────────────────────────────────
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
 const TRANSITION_DURATION = 1.2;
 
-// ─── Apply orbit limits based on view ──────────────────────────
+// ─── Apply orbit limits based on view (updated) ───────────────────────────────
 function applyLimits(controls: OrbitControls, v: ViewKey) {
   const constraints = VIEW_CONSTRAINTS[v];
   controls.minDistance = constraints.minDistance;
@@ -71,70 +82,210 @@ function applyLimits(controls: OrbitControls, v: ViewKey) {
   controls.maxAzimuthAngle = constraints.maxAzimuthAngle;
   controls.minPolarAngle = constraints.minPolarAngle;
   controls.maxPolarAngle = constraints.maxPolarAngle;
+  
+  // Special handling for overview mode
+  if (v === "overview") {
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI / 2.08;
+  }
 }
 
-// ─── Page ──────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function Project2() {
-  const [view, setView] = useState<ViewKey>("back");
+  const [view, setView] = useState<ViewKey>("back"); // Starting with Pergola View (matches reference)
 
-  const mountRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const frameRef = useRef<number>(0);
-  const clockRef = useRef(new THREE.Clock());
+  // Refs for Three.js objects (stable across renders)
+  const mountRef      = useRef<HTMLDivElement>(null);
+  const rendererRef   = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef      = useRef<THREE.Scene | null>(null);
+  const cameraRef     = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef   = useRef<OrbitControls | null>(null);
+  const frameRef      = useRef<number>(0);
+  const clockRef      = useRef(new THREE.Clock());
 
-  // Camera animation state
-  const animating = useRef(false);
-  const elapsed = useRef(0);
-  const fromPos = useRef(new THREE.Vector3());
-  const destPos = useRef(new THREE.Vector3());
-  const prevView = useRef<ViewKey | null>(null);
-  const fromView = useRef<ViewKey | null>(null);
-  const fromQuat = useRef(new THREE.Quaternion());
-  const destQuat = useRef(new THREE.Quaternion());
-  const fromTarget = useRef(new THREE.Vector3());
-  const destTarget = useRef(new THREE.Vector3());
-  const viewRef = useRef<ViewKey>("back");
+  // Camera animation state (all refs — never trigger re-renders)
+  const animating     = useRef(false);
+  const elapsed       = useRef(0);
+  const fromPos       = useRef(new THREE.Vector3());
+  const destPos       = useRef(new THREE.Vector3());
+  const prevView      = useRef<ViewKey | null>(null);
+  const fromView      = useRef<ViewKey | null>(null);
+  const fromQuat      = useRef(new THREE.Quaternion());
+  const destQuat      = useRef(new THREE.Quaternion());
+  const fromTarget    = useRef(new THREE.Vector3());
+  const destTarget    = useRef(new THREE.Vector3());
 
+  // Current view ref so the animation loop can read it without stale closure
+  const viewRef       = useRef<ViewKey>("back");
+
+  // Keep viewRef in sync when state changes
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
 
-  // ─── Init scene ───────────────────────────────────────────────
+  // ─── Init scene once on mount ───────────────────────────────────────────────
   useEffect(() => {
     if (!mountRef.current) return;
     const container = mountRef.current;
     const W = container.clientWidth;
     const H = container.clientHeight;
 
+    // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.8;
+    renderer.toneMappingExposure = 1.1;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
+    // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#d9cbb8");
     sceneRef.current = scene;
 
+    // ── 1. Procedural sky — warm tropical afternoon (Chennai ~4 pm) ───────────
+    const sky = new Sky();
+    sky.scale.setScalar(10_000);
+    scene.add(sky);
+
+    const su = sky.material.uniforms;
+    su["turbidity"].value       = 5.5;   // realistic haze
+    su["rayleigh"].value        = 1.8;   // vivid blue overhead → warm at horizon
+    su["mieCoefficient"].value  = 0.006; // gentle aerosol around sun
+    su["mieDirectionalG"].value = 0.90;  // soft but defined sun glow
+
+    // Sun: ~38° above horizon, south-west — perfect for garden shadow drama
+    const sun = new THREE.Vector3();
+    const sunPhi   = THREE.MathUtils.degToRad(52);  // 52° from zenith = 38° elevation
+    const sunTheta = THREE.MathUtils.degToRad(218); // south-west
+    sun.setFromSphericalCoords(1, sunPhi, sunTheta);
+    su["sunPosition"].value.copy(sun);
+
+    // ── 2. Atmospheric fog — warm golden haze ─────────────────────────────────
+    scene.fog = new THREE.FogExp2(0xd4c4a0, 0.0018); // amber-warm, gentle falloff
+
+    // ── 3. Procedural animated cloud layer ────────────────────────────────────
+    const cloudCanvas = document.createElement("canvas");
+    cloudCanvas.width = 2048; cloudCanvas.height = 1024;
+    const cc = cloudCanvas.getContext("2d")!;
+
+    // Helper: draw one cloud puff as an ellipse with soft radial gradient
+    const drawPuff = (x: number, y: number, rx: number, ry: number, a: number) => {
+      const g = cc.createRadialGradient(x, y, 0, x, y, rx);
+      g.addColorStop(0,    `rgba(255,253,248,${a})`);
+      g.addColorStop(0.3,  `rgba(255,248,235,${(a * 0.7).toFixed(2)})`);
+      g.addColorStop(0.65, `rgba(248,238,220,${(a * 0.28).toFixed(2)})`);
+      g.addColorStop(1,    "rgba(255,255,255,0)");
+      cc.beginPath();
+      cc.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      cc.fillStyle = g;
+      cc.fill();
+    };
+
+    // Cluster of cumulus clouds across the canvas (repeating texture)
+    const cloudDefs: [number, number, number, number, number][] = [
+      // x,   y,  rx,  ry,  alpha
+      [ 150, 180, 200,  85, 0.80],
+      [ 260, 155, 140,  60, 0.65],
+      [ 380, 200, 110,  48, 0.50],
+      [ 580, 140, 280, 110, 0.82],
+      [ 700, 120, 200,  80, 0.68],
+      [ 850, 170, 150,  65, 0.55],
+      [1050, 190, 260, 100, 0.75],
+      [1170, 160, 185,  75, 0.62],
+      [1360, 145, 240, 100, 0.72],
+      [1480, 170, 175,  72, 0.58],
+      [1680, 185, 290, 115, 0.78],
+      [1820, 155, 210,  88, 0.64],
+      [1970, 195, 170,  70, 0.52],
+      //  second row — thinner wisps
+      [  80, 380, 180,  55, 0.38],
+      [ 440, 360, 220,  60, 0.42],
+      [ 820, 400, 190,  52, 0.35],
+      [1180, 370, 230,  58, 0.40],
+      [1560, 390, 200,  55, 0.36],
+      [1900, 375, 185,  50, 0.34],
+    ];
+
+    cloudDefs.forEach(([x, y, rx, ry, a]) => drawPuff(x, y, rx, ry, a));
+
+    const cloudTex = new THREE.CanvasTexture(cloudCanvas);
+    cloudTex.wrapS = THREE.RepeatWrapping;
+    cloudTex.wrapT = THREE.RepeatWrapping;
+    cloudTex.repeat.set(2, 1); // two side-by-side copies for seamless drift
+
+    const cloudMat = new THREE.MeshBasicMaterial({
+      map: cloudTex,
+      transparent: true,
+      opacity: 0.60,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const cloudMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(3000, 1200),
+      cloudMat
+    );
+    cloudMesh.rotation.x = -Math.PI / 2;
+    cloudMesh.position.set(0, 300, 0);
+    scene.add(cloudMesh);
+
+    // ── 4. Sun glow billboard (additive blended, always faces camera) ─────────
+    const glowCanvas = document.createElement("canvas");
+    glowCanvas.width = glowCanvas.height = 512;
+    const gc = glowCanvas.getContext("2d")!;
+    const gr = gc.createRadialGradient(256, 256, 0, 256, 256, 256);
+    gr.addColorStop(0,    "rgba(255,235,160,1)");
+    gr.addColorStop(0.12, "rgba(255,195,90,0.65)");
+    gr.addColorStop(0.35, "rgba(255,140,40,0.22)");
+    gr.addColorStop(0.65, "rgba(255,100,20,0.06)");
+    gr.addColorStop(1,    "rgba(255,80,0,0)");
+    gc.fillStyle = gr;
+    gc.fillRect(0, 0, 512, 512);
+
+    const glowMat = new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(glowCanvas),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const glowMesh = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), glowMat);
+    glowMesh.position.copy(sun.clone().multiplyScalar(9500));
+    glowMesh.lookAt(new THREE.Vector3(0, 0, 0));
+    scene.add(glowMesh);
+
+    // ── 5. Extended ground plane — garden grass beyond model footprint ─────────
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x4a7040,   // muted garden green
+      roughness: 0.95,
+      metalness: 0,
+    });
+    const groundMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2000, 2000, 1, 1),
+      groundMat
+    );
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.y = -0.05;
+    groundMesh.receiveShadow = true;
+    scene.add(groundMesh);
+
+    // Camera - starting with back view (pergola view) as in reference
     const camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 500);
     camera.position.copy(VIEWS.back.position);
+    // Set target properly for the starting view
     const startTarget = VIEWS.back.target;
     camera.lookAt(startTarget);
     cameraRef.current = camera;
 
+    // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
     controls.rotateSpeed = 0.55;
-    controls.zoomSpeed = 2.0;            // ✅ much faster zoom
+    controls.zoomSpeed = 0.8;
     controls.panSpeed = 0.7;
     controls.target.copy(startTarget);
     controls.mouseButtons = {
@@ -151,73 +302,87 @@ export default function Project2() {
     controlsRef.current = controls;
     prevView.current = "back";
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+    // Lights — tuned for warm tropical afternoon, synced to sky sun
+    const ambient = new THREE.AmbientLight(0xffeedd, 0.6); // soft warm fill
     scene.add(ambient);
 
-    const key = new THREE.DirectionalLight(0xffffff, 3.0);
-    key.position.set(15, 20, 10);
+    const key = new THREE.DirectionalLight(0xffe0a0, 3.4); // golden sunlight
+    key.position.copy(sun.clone().multiplyScalar(60));      // exactly where sky sun is
     key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048);
     key.shadow.camera.near = 0.1;
-    key.shadow.camera.far = 100;
-    key.shadow.camera.left = -25;
-    key.shadow.camera.right = 25;
-    key.shadow.camera.top = 25;
+    key.shadow.camera.far  = 100;
+    key.shadow.camera.left   = -25;
+    key.shadow.camera.right  = 25;
+    key.shadow.camera.top    = 25;
     key.shadow.camera.bottom = -25;
     scene.add(key);
 
-    const fill1 = new THREE.DirectionalLight(0xc8e0ff, 1.0);
-    fill1.position.set(-10, 8, -10);
+    const fill1 = new THREE.DirectionalLight(0x90b8e0, 0.9); // cool sky-blue fill from opposite
+    fill1.position.set(-12, 14, 10);
     scene.add(fill1);
 
-    const fill2 = new THREE.DirectionalLight(0xffffff, 0.8);
-    fill2.position.set(0, 5, 10);
+    const fill2 = new THREE.DirectionalLight(0xffd090, 0.5); // warm bounce from ground
+    fill2.position.set(0, -3, 8);
     scene.add(fill2);
 
-    const hemi = new THREE.HemisphereLight(0x87ceeb, 0xc8a97e, 0.6);
+    const hemi = new THREE.HemisphereLight(0x9ec8ff, 0x5a8040, 0.75); // sky-blue / rich garden green
     scene.add(hemi);
 
-    // Load model
+    // Load the model
     const draco = new DRACOLoader();
     draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
     const loader = new GLTFLoader();
     loader.setDRACOLoader(draco);
     loader.load("/landscape fpr renovation 2-blender.glb", (gltf) => {
       const model = gltf.scene;
+
       model.scale.set(1, 1, 1);
       model.position.set(0, 0, 0);
       model.rotation.set(0, 0, 0);
       model.updateMatrixWorld(true);
 
-      const box = new THREE.Box3().setFromObject(model);
+      const box    = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const scale = 40 / Math.max(size.x, size.y, size.z);
+      const size   = box.getSize(new THREE.Vector3());
+      const scale  = 40 / Math.max(size.x, size.y, size.z); // Using scale from reference
+
       model.scale.setScalar(scale);
       model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
 
       model.traverse((child) => {
         const mesh = child as THREE.Mesh;
         if (!mesh.isMesh) return;
-        mesh.castShadow = true;
+        mesh.castShadow    = true;
         mesh.receiveShadow = true;
         mesh.frustumCulled = false;
+
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         mats.forEach((mat) => {
           if (!(mat instanceof THREE.MeshStandardMaterial)) return;
-          if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+
+          // Correct color-space on diffuse + emissive textures
+          if (mat.map)         mat.map.colorSpace         = THREE.SRGBColorSpace;
           if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
-          mat.polygonOffset = true;
+
+          // Strong polygon offset to eliminate z-fighting on coplanar surfaces
+          mat.polygonOffset       = true;
           mat.polygonOffsetFactor = 2;
-          mat.polygonOffsetUnits = 4;
-          if (mat.transparent || mat.opacity < 1) mat.depthWrite = false;
+          mat.polygonOffsetUnits  = 4;
+
+          // Transparent materials need depthWrite off to avoid sorting glitches
+          if (mat.transparent || mat.opacity < 1) {
+            mat.depthWrite = false;
+          }
+
           mat.needsUpdate = true;
         });
       });
+
       scene.add(model);
     });
 
+    // Resize handler
     const onResize = () => {
       if (!mountRef.current) return;
       const w = mountRef.current.clientWidth;
@@ -228,40 +393,55 @@ export default function Project2() {
     };
     window.addEventListener("resize", onResize);
 
+    // Animation loop — camera transition logic with target animation
     const animate = () => {
       frameRef.current = requestAnimationFrame(animate);
       const delta = clockRef.current.getDelta();
-      const ctrl = controlsRef.current!;
-      const cam = cameraRef.current!;
+      const ctrl  = controlsRef.current!;
+      const cam   = cameraRef.current!;
       const currentView = viewRef.current;
 
+      // View changed → kick off transition
       if (prevView.current !== currentView) {
         fromView.current = prevView.current;
         fromPos.current.copy(cam.position);
         fromQuat.current.copy(cam.quaternion);
         fromTarget.current.copy(ctrl.target);
+
         destPos.current.copy(VIEWS[currentView].position);
         destTarget.current.copy(VIEWS[currentView].target);
+
+        // Create a temporary camera to calculate the target quaternion
         const scratchCam = cam.clone();
         scratchCam.position.copy(destPos.current);
         scratchCam.lookAt(destTarget.current);
         destQuat.current.copy(scratchCam.quaternion);
-        prevView.current = currentView;
-        elapsed.current = 0;
+
+        prevView.current  = currentView;
+        elapsed.current   = 0;
         animating.current = true;
-        ctrl.enabled = false;
+        ctrl.enabled      = false;
         applyLimits(ctrl, currentView);
       }
 
+      // Animate camera
       if (animating.current) {
         elapsed.current = Math.min(elapsed.current + delta, TRANSITION_DURATION);
         const raw = elapsed.current / TRANSITION_DURATION;
-        const t = easeInOutCubic(raw);
+        const t   = easeInOutCubic(raw);
+
+        // Interpolate position
         cam.position.lerpVectors(fromPos.current, destPos.current, t);
+        
+        // Interpolate target
         const currentTarget = new THREE.Vector3().lerpVectors(fromTarget.current, destTarget.current, t);
         ctrl.target.copy(currentTarget);
+        
+        // Interpolate rotation
         cam.quaternion.slerpQuaternions(fromQuat.current, destQuat.current, t);
+
         if (raw >= 1) {
+          // Ensure final exact position and target
           cam.position.copy(destPos.current);
           ctrl.target.copy(destTarget.current);
           cam.lookAt(destTarget.current);
@@ -272,6 +452,13 @@ export default function Project2() {
       } else {
         ctrl.update();
       }
+
+      // Slowly drift clouds westward
+      cloudTex.offset.x += delta * 0.00045;
+
+      // Keep sun glow always facing camera
+      glowMesh.quaternion.copy(cam.quaternion);
+
       renderer.render(scene, cam);
     };
     animate();
@@ -340,7 +527,7 @@ export default function Project2() {
           display: grid;
           grid-template-columns: 1fr auto 1fr;
           align-items: center;
-          height: 64px;
+          height: 94px;
         }
 
         .nav-back {
@@ -348,7 +535,7 @@ export default function Project2() {
           align-items: center;
           gap: 8px;
           font-family: 'JetBrains Mono', monospace;
-          font-size: 0.68rem;
+          font-size: 1rem;
           letter-spacing: 0.1em;
           text-transform: uppercase;
           color: var(--brown-500);
@@ -631,18 +818,16 @@ export default function Project2() {
         <div className="main">
           <aside className="sidebar">
             <div className="sidebar-section">
-              <span className="sidebar-label">Portfolio — 02</span>
+              <span className="sidebar-label">Portfolio — 01</span>
               <h1 className="sidebar-title">
-                Modern <em>Commercial</em><br />Complex
+                Terrace <em>Garden</em>
               </h1>
             </div>
 
             <div className="sidebar-section">
               <span className="sidebar-label">Overview</span>
               <p className="sidebar-body">
-                A state-of-the-art commercial development featuring contemporary
-                architecture and sustainable design principles. Explore the
-                structure in full 3D detail.
+                A carefully executed expansion of a commercial building in Sowcarpet, addressing structural limitations with lightweight materials and efficient design. The project integrates new floors and a refined terrace garden to enhance both functionality and long-term durability.
               </p>
             </div>
 
@@ -650,11 +835,11 @@ export default function Project2() {
               <span className="sidebar-label">Project Details</span>
               <div className="meta-row">
                 {[
-                  ["Type", "Commercial"],
+                  ["Type", "Residential Renovation"],
                   ["Year", "2025"],
-                  ["Status", "In Progress"],
+                  ["Status", "Completed"],
                   ["Location", "Chennai, IN"],
-                  ["Area", "25,000 sq ft"],
+                  ["Area", "1200 sq ft"],
                 ].map(([k, v]) => (
                   <div key={k} className="meta-item">
                     <span className="meta-key">{k}</span>
@@ -692,7 +877,11 @@ export default function Project2() {
             </div>
 
             <div className="canvas-wrap">
-              <div ref={mountRef} style={{ position: "absolute", inset: 0 }} />
+              {/* Stable mount div — Three.js renderer appends its canvas here once */}
+              <div
+                ref={mountRef}
+                style={{ position: "absolute", inset: 0 }}
+              />
             </div>
 
             <div className="hints-bar">
@@ -712,7 +901,7 @@ export default function Project2() {
                   <span className="hint-dot" />
                   <span className="hint-item">Limited rotation around seating area</span>
                   <span className="hint-dot" />
-                  <span className="hint-item">Scroll to zoom (much wider range now)</span>
+                  <span className="hint-item">Scroll to zoom</span>
                 </>
               ) : (
                 <>
@@ -720,7 +909,7 @@ export default function Project2() {
                   <span className="hint-dot" />
                   <span className="hint-item">Limited rotation around pergola</span>
                   <span className="hint-dot" />
-                  <span className="hint-item">Scroll to zoom (quick & responsive)</span>
+                  <span className="hint-item">Scroll to zoom</span>
                 </>
               )}
             </div>

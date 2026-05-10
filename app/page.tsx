@@ -237,7 +237,7 @@ export default function HeroFramesWheel() {
 
       {/* Visible content sections after hero */}
       {/* -mt-px prevents a 1px seam caused by sub-pixel rounding between sticky hero and this section */}
-      <section className="relative -mt-px min-h-screen w-full bg-zinc-900 flex flex-col items-center justify-center">
+      {/* <section className="relative -mt-px min-h-screen w-full bg-zinc-900 flex flex-col items-center justify-center">
         <div className="max-w-4xl px-8 text-center">
           <h2 className="text-white text-4xl md:text-6xl font-bold mb-6">Next Section</h2>
           <p className="text-zinc-400 text-lg md:text-xl leading-relaxed">
@@ -253,7 +253,7 @@ export default function HeroFramesWheel() {
             Add your services, projects, or any other sections here. Lenis keeps the scroll smooth across the whole page.
           </p>
         </div>
-      </section>
+      </section> */}
     </main>
   );
 }

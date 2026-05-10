@@ -6,14 +6,17 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { Sky } from "three/examples/jsm/objects/Sky.js";
 
 // ─── Camera Views (front, back, top only) ────────────────────────────────────
 const TARGET = new THREE.Vector3(0, 2, 0);
 
-const VIEWS = {
-  front: { position: new THREE.Vector3(3,  3, -9) },
-  back:  { position: new THREE.Vector3(-4, 4,  12) },
-  top:   { position: new THREE.Vector3(0,  14,  0) },
+const 
+VIEWS = {
+  front: { position: new THREE.Vector3(5.577, 1.029, -4.799) },
+  back:  { position: new THREE.Vector3(-4, 4, 12) },
+  top:   { position: new THREE.Vector3(0, 14, 0) },
+
 };
 
 type ViewKey = keyof typeof VIEWS;
@@ -106,8 +109,25 @@ export default function Project2() {
 
     // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#d9cbb8"); // --parchment
     sceneRef.current = scene;
+
+    // ── Procedural sky ────────────────────────────────────────────────────────
+    const sky = new Sky();
+    sky.scale.setScalar(450_000);
+    scene.add(sky);
+
+    const skyUniforms = sky.material.uniforms;
+    skyUniforms["turbidity"].value       = 4;      // haze / atmosphere thickness
+    skyUniforms["rayleigh"].value        = 0.8;    // blue-sky scattering
+    skyUniforms["mieCoefficient"].value  = 0.004;  // aerosol density
+    skyUniforms["mieDirectionalG"].value = 0.85;   // sun-glow sharpness
+
+    // Sun at a pleasant mid-morning angle
+    const sun = new THREE.Vector3();
+    const sunPhi   = THREE.MathUtils.degToRad(75);  // 75° from zenith → ~15° above horizon
+    const sunTheta = THREE.MathUtils.degToRad(195); // roughly south-south-west
+    sun.setFromSphericalCoords(1, sunPhi, sunTheta);
+    skyUniforms["sunPosition"].value.copy(sun);
 
     // Camera
     const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
@@ -141,8 +161,8 @@ export default function Project2() {
     const ambient = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(ambient);
 
-    const key = new THREE.DirectionalLight(0xffffff, 2.5);
-    key.position.set(10, 15, 10);
+    const key = new THREE.DirectionalLight(0xfff4e0, 2.5); // warm sunlight tint
+    key.position.copy(sun.clone().multiplyScalar(50));     // match sky sun direction
     key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048);
     key.shadow.camera.near = 0.1;
@@ -161,7 +181,7 @@ export default function Project2() {
     fill2.position.set(0, 5, 10);
     scene.add(fill2);
 
-    const hemi = new THREE.HemisphereLight(0x87ceeb, 0xc8a97e, 0.7);
+    const hemi = new THREE.HemisphereLight(0x9ecfff, 0x6b8c5a, 0.6); // sky-blue top, soft green-grey ground
     scene.add(hemi);
 
     // Load the model
@@ -390,7 +410,7 @@ export default function Project2() {
           display: grid;
           grid-template-columns: 1fr auto 1fr;
           align-items: center;
-          height: 64px;
+          height: 100px;
         }
 
         .nav-back {
@@ -398,7 +418,7 @@ export default function Project2() {
           align-items: center;
           gap: 8px;
           font-family: 'JetBrains Mono', monospace;
-          font-size: 0.68rem;
+          font-size: 1rem;
           letter-spacing: 0.1em;
           text-transform: uppercase;
           color: var(--brown-500);
@@ -664,7 +684,46 @@ export default function Project2() {
           .viewer-panel { padding: 24px 16px; gap: 16px; }
           .canvas-wrap { min-height: 300px; }
           .hints-bar { gap: 12px; }
-          .toggle-btn { padding: 6px 12px; font-size: 0.6rem; }
+          
+          /* Mobile toggle buttons - pill style from reference */
+          .viewer-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+          }
+          
+          .toggle-group {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 100px;
+            padding: 6px;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 100%;
+            justify-content: center;
+          }
+          
+          .toggle-btn {
+            padding: 10px 18px;
+            font-size: 0.75rem;
+            border-radius: 100px;
+            background: transparent;
+            color: #555;
+            font-weight: 600;
+          }
+          
+          .toggle-btn.active {
+            background: #111;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          }
+          
+          .toggle-btn:not(.active):hover {
+            background: rgba(255, 255, 255, 0.6);
+            color: #111;
+          }
         }
       `}</style>
 
@@ -683,28 +742,27 @@ export default function Project2() {
             <div className="sidebar-section">
               <span className="sidebar-label">Portfolio — 02</span>
               <h1 className="sidebar-title">
-                Modern <em>Commercial</em><br />Complex
+                NOVA <em>Villa</em>
               </h1>
             </div>
 
             <div className="sidebar-section">
               <span className="sidebar-label">Overview</span>
               <p className="sidebar-body">
-                A state-of-the-art commercial development featuring contemporary
-                architecture and sustainable design principles. Explore the
-                structure in full 3D detail.
-              </p>
+A thoughtfully planned villa on a challenging site, balancing spatial efficiency with Vastu-aligned design and a refined architectural expression.
+A well-defined <br></br>2-bedroom layout ensures comfort, openness, and efficient use of space throughout.            </p>
             </div>
 
             <div className="sidebar-section">
               <span className="sidebar-label">Project Details</span>
               <div className="meta-row">
                 {[
-                  ["Type",     "Commercial"],
-                  ["Year",     "2025"],
+                  ["Type",     "Construction"],
+                  ["Year",     "2026"],
                   ["Status",   "In Progress"],
                   ["Location", "Chennai, IN"],
-                  ["Area",     "25,000 sq ft"],
+                  ["Area",     "1300 sq ft"],
+                  ["timeline", "12 months"],
                 ].map(([k, v]) => (
                   <div key={k} className="meta-item">
                     <span className="meta-key">{k}</span>

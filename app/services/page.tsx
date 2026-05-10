@@ -490,10 +490,7 @@ export default function Services() {
             </Link>
           </div>
           
-          <div className="contact-footer-bar">
-            <span>© 2026 SKS GROUPS</span>
-            <span>ELEVATING STANDARDS</span>
-          </div>
+          
         </div>
 
       </section>
